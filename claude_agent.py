@@ -128,8 +128,17 @@ def chat(question: str, historique: list, data: dict) -> dict:
     try:
         system   = build_system_prompt(data)
         messages = []
-        for msg in historique:
-            messages.append({"role": msg["role"], "content": msg["content"]})
+
+        # Garder seulement les 6 derniers échanges (3 Q + 3 R)
+        # pour éviter de dépasser la limite de tokens
+        recent = historique[-6:] if len(historique) > 6 else historique
+        for msg in recent:
+            # Tronquer les réponses longues dans l'historique
+            content = msg["content"]
+            if msg["role"] == "assistant" and len(content) > 1000:
+                content = content[:1000] + "...[suite tronquée]"
+            messages.append({"role": msg["role"], "content": content})
+
         messages.append({"role": "user", "content": question})
 
         response = _client.messages.create(
@@ -149,4 +158,7 @@ def chat(question: str, historique: list, data: dict) -> dict:
         if "429" in err:
             return {"success": False,
                     "response": "⚠️ Limite atteinte. Réessayez dans quelques secondes."}
+        if "max_tokens" in err.lower() or "context" in err.lower() or "length" in err.lower():
+            return {"success": False,
+                    "response": "⚠️ Conversation trop longue. Cliquez sur 'Nouvelle conversation' pour continuer."}
         return {"success": False, "response": f"❌ Erreur Claude : {err}"}
