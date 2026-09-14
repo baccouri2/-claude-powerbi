@@ -4,8 +4,11 @@ Agent Claude via CometAPI
 Données dashboard Power BI + données supplémentaires Odoo
 """
 
-import anthropic, json
+import anthropic
 from config import CLAUDE_API_KEY, CLAUDE_BASE_URL, CLAUDE_MODEL
+from datetime import date, datetime
+from decimal import Decimal
+import json
 
 _client = anthropic.Anthropic(
     base_url=CLAUDE_BASE_URL,
@@ -13,8 +16,25 @@ _client = anthropic.Anthropic(
 )
 
 
+# ── Sérialisation JSON sécurisée ──────────────────────────
+class SafeEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (date, datetime)):
+            return obj.isoformat()
+        if isinstance(obj, Decimal):
+            return float(obj)
+        try:
+            return super().default(obj)
+        except TypeError:
+            return str(obj)
+
+
+def safe_json(data) -> str:
+    """Convertit n'importe quelle donnée en JSON string sécurisée"""
+    return json.dumps(data, cls=SafeEncoder, ensure_ascii=False, indent=2)
+
+
 def build_system_prompt(data: dict) -> str:
-    """Prompt avec données dashboard + données supplémentaires"""
     k  = data.get("kpis", {})
     kp = data.get("kpis_prod", {})
 
@@ -37,22 +57,23 @@ RAPPORT POWER BI "stage bi" — 3 PAGES
   Nb Clients      : {int(k.get("nb_clients",0))}
   Panier Moyen    : {k.get("panier_moyen",0):,.2f} DT
   Qté Vendue      : {int(k.get("qte_vendue",0))}
+  Période         : {k.get("date_debut","")} → {k.get("date_fin","")}
 
 Évolution CA par mois :
-{json.dumps(data.get("evolution_ca", []), ensure_ascii=False, indent=2)}
+{safe_json(data.get("evolution_ca", []))}
 
 CA par client :
-{json.dumps(data.get("clients", []), ensure_ascii=False, indent=2)}
+{safe_json(data.get("clients", []))}
 
 CA par catégorie :
-{json.dumps(data.get("categories", []), ensure_ascii=False, indent=2)}
+{safe_json(data.get("categories", []))}
 
 ■ PAGE 2 — ANALYSE COMMERCIALE
 Statuts commandes :
-{json.dumps(data.get("statuts", []), ensure_ascii=False, indent=2)}
+{safe_json(data.get("statuts", []))}
 
 Quantité par mois :
-{json.dumps(data.get("qte_par_mois", []), ensure_ascii=False, indent=2)}
+{safe_json(data.get("qte_par_mois", []))}
 
 ■ PAGE 3 — ANALYSE PRODUITS
   Prix Moyen     : {kp.get("prix_moyen",0):,.2f} DT
@@ -61,59 +82,56 @@ Quantité par mois :
   Non Vendus     : {int(kp.get("nb_non_vendus",0))}
 
 Top 10 produits par CA :
-{json.dumps(data.get("top10_ca", []), ensure_ascii=False, indent=2)}
+{safe_json(data.get("top10_ca", []))}
 
 Top 5 produits par quantité :
-{json.dumps(data.get("top5_qte", []), ensure_ascii=False, indent=2)}
+{safe_json(data.get("top5_qte", []))}
 
 Top 10 produits par panier moyen :
-{json.dumps(data.get("top10_panier", []), ensure_ascii=False, indent=2)}
+{safe_json(data.get("top10_panier", []))}
 
 Détail ventes par produit :
-{json.dumps(data.get("detail_produits", []), ensure_ascii=False, indent=2)}
+{safe_json(data.get("detail_produits", []))}
 
 ════════════════════════════════════════════════
 DONNÉES SUPPLÉMENTAIRES ODOO (hors dashboard)
 ════════════════════════════════════════════════
 
 Historique des 50 dernières commandes :
-{json.dumps(data.get("historique", []), ensure_ascii=False, indent=2)}
+{safe_json(data.get("historique", []))}
 
-Catalogue complet des produits (prix, catégorie, type) :
-{json.dumps(data.get("tous_produits", []), ensure_ascii=False, indent=2)}
+Catalogue complet des produits :
+{safe_json(data.get("tous_produits", []))}
 
-Détails clients (email, ville, historique complet) :
-{json.dumps(data.get("clients_details", []), ensure_ascii=False, indent=2)}
+Détails clients (email, ville, historique) :
+{safe_json(data.get("clients_details", []))}
 
 CA croisé Produit × Client (Top 30) :
-{json.dumps(data.get("croise_produit_client", []), ensure_ascii=False, indent=2)}
+{safe_json(data.get("croise_produit_client", []))}
 
 Tendances par semaine :
-{json.dumps(data.get("tendances_hebdo", []), ensure_ascii=False, indent=2)}
+{safe_json(data.get("tendances_hebdo", []))}
 
-Devis non convertis (opportunités commerciales) :
-{json.dumps(data.get("devis_non_convertis", []), ensure_ascii=False, indent=2)}
+Devis non convertis (opportunités) :
+{safe_json(data.get("devis_non_convertis", []))}
 
 ════════════════════════════════════════════════
 RÈGLES :
 - Utilise ces données pour répondre à TOUTES les questions
 - Cite les chiffres exacts
 - Réponds en français
-- Si une question dépasse les données disponibles,
-  dis-le clairement et propose une analyse basée sur
-  les données existantes
 ════════════════════════════════════════════════"""
 
 
 def chat(question: str, historique: list, data: dict) -> dict:
     """Conversation Claude avec toutes les données"""
-    system   = build_system_prompt(data)
-    messages = []
-    for msg in historique:
-        messages.append({"role": msg["role"], "content": msg["content"]})
-    messages.append({"role": "user", "content": question})
-
     try:
+        system   = build_system_prompt(data)
+        messages = []
+        for msg in historique:
+            messages.append({"role": msg["role"], "content": msg["content"]})
+        messages.append({"role": "user", "content": question})
+
         response = _client.messages.create(
             model=CLAUDE_MODEL,
             max_tokens=2048,
