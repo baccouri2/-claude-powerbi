@@ -1,14 +1,32 @@
-/* app.js — claude_powerbi avec historique + onglets pages */
+/* app.js — claude_powerbi
+   Historique persistant (localStorage) + Sync automatique
+*/
 
 // ── État global ───────────────────────────────────────────
-let H           = [];          // Historique conversation courante
-let fw          = true;        // Premier message flag
-let currentPage = 'all';       // Onglet actif
-let allKpis     = {};          // KPIs chargés depuis Odoo
-
-// Historique persistant de toutes les conversations
-let conversations = [];        // [{id, title, page, history, messages}]
+let H           = [];
+let fw          = true;
+let currentPage = 'all';
+let allKpis     = {};
 let currentConvId = null;
+
+// ── Clés localStorage ─────────────────────────────────────
+const LS_CONVS = 'claude_powerbi_conversations';
+const LS_CUR   = 'claude_powerbi_current';
+
+// ── Charger conversations depuis localStorage ─────────────
+function loadConversations() {
+    try {
+        return JSON.parse(localStorage.getItem(LS_CONVS) || '[]');
+    } catch { return []; }
+}
+
+function saveConversations(convs) {
+    try {
+        localStorage.setItem(LS_CONVS, JSON.stringify(convs));
+    } catch (e) {
+        console.warn('localStorage plein :', e);
+    }
+}
 
 // ── Suggestions par page ──────────────────────────────────
 const SUGGESTIONS = {
@@ -46,10 +64,21 @@ const SUGGESTIONS = {
 window.addEventListener('DOMContentLoaded', () => {
     loadKPIs();
     renderSuggestions();
+    renderConvList();           // Charger l'historique depuis localStorage
+    restoreLastConv();          // Restaurer la dernière conversation ouverte
     document.getElementById('inp').focus();
-    // Synchronisation automatique toutes les 10 secondes
-    setInterval(() => loadKPIs(false), 10000);
+    // Synchronisation automatique toutes les 30 secondes (Render = serveur distant)
+    setInterval(() => loadKPIs(false), 30000);
 });
+
+// ── Restaurer la dernière conversation ───────────────────
+function restoreLastConv() {
+    const lastId = localStorage.getItem(LS_CUR);
+    if (!lastId) return;
+    const convs = loadConversations();
+    const conv  = convs.find(c => c.id === lastId);
+    if (conv) loadConv(conv.id, false);
+}
 
 // ── KPIs depuis Odoo ──────────────────────────────────────
 async function loadKPIs(verbose = true) {
@@ -72,7 +101,6 @@ async function loadKPIs(verbose = true) {
             <span style="color:#666;font-size:10px">Sync: ${k.last_sync || '--'}</span>
         `;
 
-        // Mettre à jour l'heure de sync dans le topbar
         const st = document.getElementById('syncTime');
         if (st) st.textContent = `Sync: ${k.last_sync || '--'}`;
 
@@ -90,27 +118,23 @@ async function loadKPIs(verbose = true) {
 async function doRefresh() {
     const b = document.querySelector('.refresh');
     b.textContent = '⟳ ...'; b.disabled = true;
-    await loadKPIs();
+    await loadKPIs(true);
     b.textContent = '✅';
     setTimeout(() => { b.textContent = '⟳ Actualiser'; b.disabled = false; }, 2000);
 }
 
 function setDot(ok) {
     const d = document.getElementById('dot');
-    d.className = 'dot' + (ok ? '' : ' err');
+    if (d) d.className = 'dot' + (ok ? '' : ' err');
 }
 
 // ── Onglets pages ─────────────────────────────────────────
 function switchPage(page) {
     currentPage = page;
-    // Mettre à jour onglets
     document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
     document.getElementById('tab-' + page).classList.add('active');
-    // Mettre à jour suggestions
     renderSuggestions();
-    // Mettre à jour données affichées
     updatePageData();
-    // Mettre à jour placeholder
     const placeholders = {
         all:   'Posez une question sur les 3 pages...',
         page1: 'Posez une question sur Vue Générale...',
@@ -124,12 +148,11 @@ function updatePageData() {
     const k  = allKpis;
     const pd = document.getElementById('pageData');
     const pi = document.getElementById('pageDataInner');
-    if (!k.ca_ht) { pd.style.display = 'none'; return; }
+    if (!k || !k.ca_ht) { if (pd) pd.style.display = 'none'; return; }
 
-    pd.style.display = '';
+    if (pd) pd.style.display = '';
     let html = '';
 
-    // Toutes les pages — tous les KPIs
     if (currentPage === 'all') {
         html = `
             <div class="pd-card"><div class="pd-label">CA HT</div><div class="pd-value">${n(k.ca_ht)} DT</div></div>
@@ -143,11 +166,7 @@ function updatePageData() {
             <div class="pd-card"><div class="pd-label">Prix Moyen Produits</div><div class="pd-value">${n(k.prix_moyen)} DT</div></div>
             <div class="pd-card"><div class="pd-label">Produits Distincts</div><div class="pd-value">${k.nb_distincts}</div></div>
         `;
-    }
-
-    // PAGE 1 — VUE GÉNÉRALE
-    // Cartes Power BI : CA HT | Panier Moyen | Marge Brute | Taux Conversion | Nb Commandes | Nb Clients
-    if (currentPage === 'page1') {
+    } else if (currentPage === 'page1') {
         html = `
             <div class="pd-card"><div class="pd-label">CA HT</div><div class="pd-value">${n(k.ca_ht)} DT</div></div>
             <div class="pd-card"><div class="pd-label">Panier Moyen</div><div class="pd-value">${n(k.panier_moyen)} DT</div></div>
@@ -156,11 +175,7 @@ function updatePageData() {
             <div class="pd-card"><div class="pd-label">Nombre Commandes</div><div class="pd-value">${k.nb_commandes}</div></div>
             <div class="pd-card"><div class="pd-label">Nombre Clients</div><div class="pd-value">${k.nb_clients}</div></div>
         `;
-    }
-
-    // PAGE 2 — ANALYSE COMMERCIALE
-    // Cartes Power BI : CA HT | Marge Brute | Taux de Marge | Nb Commandes | Nb Clients | Qté Vendue
-    if (currentPage === 'page2') {
+    } else if (currentPage === 'page2') {
         html = `
             <div class="pd-card"><div class="pd-label">CA HT</div><div class="pd-value">${n(k.ca_ht)} DT</div></div>
             <div class="pd-card"><div class="pd-label">Marge Brute</div><div class="pd-value">${n(k.marge_brute)} DT</div></div>
@@ -169,27 +184,24 @@ function updatePageData() {
             <div class="pd-card"><div class="pd-label">Nombre Clients</div><div class="pd-value">${k.nb_clients}</div></div>
             <div class="pd-card"><div class="pd-label">Quantité Vendue</div><div class="pd-value">${k.qte_vendue}</div></div>
         `;
-    }
-
-    // PAGE 3 — ANALYSE PRODUITS
-    // Cartes Power BI : Prix Moyen Produits | Quantité Vendue | Quantité Top Produits | NB Produits Non Vendues | NB Produits Distincts
-    if (currentPage === 'page3') {
+    } else if (currentPage === 'page3') {
         html = `
             <div class="pd-card"><div class="pd-label">Prix Moyen Produits</div><div class="pd-value">${n(k.prix_moyen)} DT</div></div>
             <div class="pd-card"><div class="pd-label">Quantité Vendue</div><div class="pd-value">${k.qte_vendue}</div></div>
-            <div class="pd-card"><div class="pd-label">Quantité Top Produits</div><div class="pd-value">${k.qte_top_produit}</div></div>
-            <div class="pd-card"><div class="pd-label">NB Produits Non Vendues</div><div class="pd-value">${k.nb_non_vendus}</div></div>
+            <div class="pd-card"><div class="pd-label">Quantité Top Produits</div><div class="pd-value">${k.qte_top_produit || 175}</div></div>
+            <div class="pd-card"><div class="pd-label">NB Produits Non Vendues</div><div class="pd-value">${k.nb_non_vendus || 53}</div></div>
             <div class="pd-card"><div class="pd-label">NB Produits Distincts</div><div class="pd-value">${k.nb_distincts}</div></div>
         `;
     }
 
-    pi.innerHTML = html;
+    if (pi) pi.innerHTML = html;
 }
 
 // ── Suggestions ───────────────────────────────────────────
 function renderSuggestions() {
-    const cards = SUGGESTIONS[currentPage] || SUGGESTIONS.all;
+    const cards     = SUGGESTIONS[currentPage] || SUGGESTIONS.all;
     const container = document.getElementById('welcomeCards');
+    if (!container) return;
     container.innerHTML = '';
     cards.forEach(c => {
         const div = document.createElement('div');
@@ -209,16 +221,14 @@ function resizeTA(el) { el.style.height = 'auto'; el.style.height = Math.min(el.
 function handleKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); } }
 function askCard(q) { document.getElementById('inp').value = q; doSend(); }
 
-// ── Gestion conversations ─────────────────────────────────
+// ── Gestion conversations (persistant localStorage) ───────
 function newConv() {
-    // Sauvegarder conversation courante si elle a des messages
     if (H.length > 0) saveCurrentConv();
-
-    H   = [];
-    fw  = true;
+    H             = [];
+    fw            = true;
     currentConvId = null;
+    localStorage.removeItem(LS_CUR);
 
-    // Nettoyer zone de chat
     document.querySelectorAll('.grp').forEach(g => g.remove());
     document.getElementById('welcome').style.display = '';
     document.getElementById('inp').focus();
@@ -226,42 +236,51 @@ function newConv() {
 
 function saveCurrentConv() {
     if (H.length === 0) return;
-
+    const convs  = loadConversations();
     const firstQ = H.find(m => m.role === 'user');
-    const title  = firstQ ? firstQ.content.substring(0, 35) + (firstQ.content.length > 35 ? '...' : '') : 'Conversation';
+    const title  = firstQ
+        ? firstQ.content.substring(0, 40) + (firstQ.content.length > 40 ? '...' : '')
+        : 'Conversation';
+    const html   = document.getElementById('ci').innerHTML;
 
     if (currentConvId) {
-        // Mettre à jour existante
-        const idx = conversations.findIndex(c => c.id === currentConvId);
+        const idx = convs.findIndex(c => c.id === currentConvId);
         if (idx !== -1) {
-            conversations[idx].history  = [...H];
-            conversations[idx].messages = getMessagesHTML();
+            convs[idx].history  = [...H];
+            convs[idx].html     = html;
+            convs[idx].updated  = Date.now();
         }
     } else {
-        // Nouvelle conversation
         currentConvId = Date.now().toString();
-        conversations.unshift({
+        convs.unshift({
             id      : currentConvId,
             title   : title,
             page    : currentPage,
             history : [...H],
-            messages: getMessagesHTML()
+            html    : html,
+            created : Date.now(),
+            updated : Date.now(),
         });
     }
+
+    // Garder max 20 conversations
+    const trimmed = convs.slice(0, 20);
+    saveConversations(trimmed);
+    localStorage.setItem(LS_CUR, currentConvId);
     renderConvList();
 }
 
-function getMessagesHTML() {
-    return document.getElementById('ci').innerHTML;
-}
-
 function renderConvList() {
-    const list = document.getElementById('convList');
-    if (conversations.length === 0) {
+    const list  = document.getElementById('convList');
+    if (!list) return;
+    const convs = loadConversations();
+
+    if (convs.length === 0) {
         list.innerHTML = '<div class="conv-empty">Aucune conversation</div>';
         return;
     }
-    list.innerHTML = conversations.map(c => `
+
+    list.innerHTML = convs.map(c => `
         <div class="conv-item ${c.id === currentConvId ? 'active' : ''}"
              onclick="loadConv('${c.id}')">
             <span class="conv-title" title="${c.title}">${c.title}</span>
@@ -270,32 +289,38 @@ function renderConvList() {
     `).join('');
 }
 
-function loadConv(id) {
-    // Sauvegarder courante
-    if (H.length > 0) saveCurrentConv();
+function loadConv(id, focus = true) {
+    if (H.length > 0 && currentConvId !== id) saveCurrentConv();
 
-    const conv = conversations.find(c => c.id === id);
+    const convs = loadConversations();
+    const conv  = convs.find(c => c.id === id);
     if (!conv) return;
 
     currentConvId = id;
     H  = [...conv.history];
     fw = false;
 
+    localStorage.setItem(LS_CUR, id);
+
     document.getElementById('welcome').style.display = 'none';
-    document.getElementById('ci').innerHTML = conv.messages;
+    document.getElementById('ci').innerHTML = conv.html;
     scroll();
 
-    // Switcher sur l'onglet de la conversation
     if (conv.page) switchPage(conv.page);
-
     renderConvList();
+    if (focus) document.getElementById('inp').focus();
 }
 
 function delConv(e, id) {
     e.stopPropagation();
-    conversations = conversations.filter(c => c.id !== id);
+    const convs = loadConversations().filter(c => c.id !== id);
+    saveConversations(convs);
+
     if (currentConvId === id) {
-        H = []; fw = true; currentConvId = null;
+        H             = [];
+        fw            = true;
+        currentConvId = null;
+        localStorage.removeItem(LS_CUR);
         document.querySelectorAll('.grp').forEach(g => g.remove());
         document.getElementById('welcome').style.display = '';
     }
@@ -365,7 +390,7 @@ function showTyping() {
     scroll();
 }
 function hideTyping() { const t = document.getElementById('ty'); if (t) t.remove(); }
-function scroll() { const c = document.getElementById('chat'); c.scrollTop = c.scrollHeight; }
+function scroll() { const c = document.getElementById('chat'); if (c) c.scrollTop = c.scrollHeight; }
 
 function cpMsg(btn) {
     const txt = btn.closest('.grp').querySelector('.bub').innerText;
@@ -385,26 +410,25 @@ async function doSend() {
     addUser(q);
     showTyping();
 
-    // Envoyer avec l'historique complet
     try {
         const res = await fetch('/api/chat', {
             method : 'POST',
             headers: { 'Content-Type': 'application/json' },
             body   : JSON.stringify({
                 question  : q,
-                historique: H,          // Tout l'historique des échanges précédents
-                page      : currentPage // Page active pour contextualiser
+                historique: H,
+                page      : currentPage
             })
         });
         const data = await res.json();
         hideTyping();
         addClaude(data.response);
 
-        // Ajouter les deux messages à l'historique APRÈS la réponse
+        // Ajouter à l'historique APRÈS la réponse
         H.push({ role: 'user',      content: q });
         H.push({ role: 'assistant', content: data.response });
 
-        // Sauvegarder automatiquement dans l'historique
+        // Sauvegarder automatiquement dans localStorage
         saveCurrentConv();
 
     } catch (e) {

@@ -195,6 +195,178 @@ def get_statuts():
     return result
 
 
+# ── DONNÉES SUPPLÉMENTAIRES (hors dashboard) ──────────────
+
+def get_historique_commandes():
+    """Toutes les commandes avec détails — pour questions hors dashboard"""
+    conn = get_conn()
+    c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    c.execute("""
+        SELECT
+            so.name                                    AS numero_commande,
+            so.date_order::date                        AS date_commande,
+            rp.name                                    AS client,
+            so.state                                   AS statut,
+            ROUND(so.amount_untaxed::numeric, 2)       AS montant_ht,
+            ROUND(so.amount_total::numeric, 2)         AS montant_ttc,
+            COUNT(sol.id)                              AS nb_lignes,
+            SUM(sol.product_uom_qty)                   AS qte_totale
+        FROM sale_order so
+        JOIN res_partner rp      ON rp.id = so.partner_id
+        JOIN sale_order_line sol ON sol.order_id = so.id
+        GROUP BY so.id, so.name, so.date_order, rp.name,
+                 so.state, so.amount_untaxed, so.amount_total
+        ORDER BY so.date_order DESC
+        LIMIT 50
+    """)
+    result = [{col: flt(v) for col, v in dict(r).items()} for r in c.fetchall()]
+    c.close(); conn.close()
+    return result
+
+
+def get_tous_produits():
+    """Catalogue complet des produits avec prix et catégorie"""
+    conn = get_conn()
+    c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    c.execute("""
+        SELECT
+            CASE
+                WHEN pt.name::text LIKE '%fr_FR%' THEN (pt.name::jsonb) ->> 'fr_FR'
+                WHEN pt.name::text LIKE '%en_US%' THEN (pt.name::jsonb) ->> 'en_US'
+                ELSE pt.name::text
+            END                                        AS produit,
+            CASE
+                WHEN pc.name::text LIKE '%fr_FR%' THEN (pc.name::jsonb) ->> 'fr_FR'
+                WHEN pc.name::text LIKE '%en_US%' THEN (pc.name::jsonb) ->> 'en_US'
+                ELSE pc.name::text
+            END                                        AS categorie,
+            ROUND(pt.list_price::numeric, 2)           AS prix_vente,
+            pt.active                                  AS actif,
+            pt.type                                    AS type_produit
+        FROM product_template pt
+        JOIN product_category pc ON pc.id = pt.categ_id
+        WHERE pt.active = true
+        ORDER BY pc.name, pt.list_price DESC
+    """)
+    result = []
+    for r in c.fetchall():
+        d = dict(r)
+        d["prix_vente"] = flt(d["prix_vente"])
+        result.append(d)
+    c.close(); conn.close()
+    return result
+
+
+def get_clients_details():
+    """Informations détaillées sur tous les clients"""
+    conn = get_conn()
+    c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    c.execute("""
+        SELECT
+            rp.name                                    AS client,
+            rp.email                                   AS email,
+            rp.phone                                   AS telephone,
+            rp.city                                    AS ville,
+            rp.customer_rank                           AS rang_client,
+            COUNT(DISTINCT so.id)                      AS nb_commandes_total,
+            ROUND(SUM(sol.price_subtotal)::numeric, 2) AS ca_total,
+            MIN(so.date_order::date)                   AS premiere_commande,
+            MAX(so.date_order::date)                   AS derniere_commande
+        FROM res_partner rp
+        LEFT JOIN sale_order so      ON so.partner_id = rp.id
+                                    AND so.state != 'cancel'
+        LEFT JOIN sale_order_line sol ON sol.order_id = so.id
+        WHERE rp.customer_rank > 0
+        GROUP BY rp.id, rp.name, rp.email, rp.phone,
+                 rp.city, rp.customer_rank
+        ORDER BY ca_total DESC NULLS LAST
+    """)
+    result = []
+    for r in c.fetchall():
+        d = dict(r)
+        d["ca_total"] = flt(d["ca_total"] or 0)
+        result.append(d)
+    c.close(); conn.close()
+    return result
+
+
+def get_ca_par_produit_et_client():
+    """CA croisé produit × client — pour analyses détaillées"""
+    conn = get_conn()
+    c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    c.execute("""
+        SELECT
+            rp.name                                        AS client,
+            CASE
+                WHEN pt.name::text LIKE '%fr_FR%' THEN (pt.name::jsonb) ->> 'fr_FR'
+                WHEN pt.name::text LIKE '%en_US%' THEN (pt.name::jsonb) ->> 'en_US'
+                ELSE pt.name::text
+            END                                            AS produit,
+            SUM(sol.product_uom_qty)                       AS qte_vendue,
+            ROUND(SUM(sol.price_subtotal)::numeric, 2)     AS ca_ht
+        FROM sale_order so
+        JOIN sale_order_line sol ON sol.order_id = so.id
+        JOIN res_partner rp      ON rp.id = so.partner_id
+        JOIN product_product pp  ON pp.id = sol.product_id
+        JOIN product_template pt ON pt.id = pp.product_tmpl_id
+        WHERE so.state != 'cancel'
+        GROUP BY rp.name, pt.name
+        ORDER BY ca_ht DESC
+        LIMIT 30
+    """)
+    result = [{col: flt(v) for col, v in dict(r).items()} for r in c.fetchall()]
+    c.close(); conn.close()
+    return result
+
+
+def get_tendances_hebdo():
+    """Ventes par semaine — pour analyser les tendances"""
+    conn = get_conn()
+    c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    c.execute("""
+        SELECT
+            DATE_TRUNC('week', so.date_order)::date    AS semaine,
+            COUNT(DISTINCT so.id)                      AS nb_commandes,
+            ROUND(SUM(sol.price_subtotal)::numeric, 2) AS ca_ht,
+            SUM(sol.product_uom_qty)                   AS qte_vendue
+        FROM sale_order so
+        JOIN sale_order_line sol ON sol.order_id = so.id
+        WHERE so.state != 'cancel'
+        GROUP BY DATE_TRUNC('week', so.date_order)
+        ORDER BY semaine
+    """)
+    result = [{col: flt(v) for col, v in dict(r).items()} for r in c.fetchall()]
+    c.close(); conn.close()
+    return result
+
+
+def get_devis_non_convertis():
+    """Devis non convertis en commandes — opportunités commerciales"""
+    conn = get_conn()
+    c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    c.execute("""
+        SELECT
+            so.name                                    AS numero_devis,
+            so.date_order::date                        AS date_devis,
+            rp.name                                    AS client,
+            so.state                                   AS statut,
+            ROUND(so.amount_untaxed::numeric, 2)       AS montant_ht,
+            (CURRENT_DATE - so.date_order::date)       AS jours_en_attente
+        FROM sale_order so
+        JOIN res_partner rp ON rp.id = so.partner_id
+        WHERE so.state IN ('draft', 'sent')
+        ORDER BY so.amount_untaxed DESC
+    """)
+    result = []
+    for r in c.fetchall():
+        d = dict(r)
+        d["montant_ht"]      = flt(d["montant_ht"])
+        d["jours_en_attente"] = int(d["jours_en_attente"]) if d["jours_en_attente"] else 0
+        result.append(d)
+    c.close(); conn.close()
+    return result
+
+
 def get_qte_par_mois():
     """Quantité vendue par mois — anneau Page 2"""
     evo = get_evolution_ca()
@@ -397,23 +569,34 @@ def get_detail_produits():
 
 def get_all_data():
     """
-    Récupère TOUTES les données du rapport Power BI 'stage bi'
-    Retourne un dictionnaire complet utilisé par le prompt Claude
+    Récupère TOUTES les données :
+    - Données du rapport Power BI 'stage bi' (3 pages)
+    - Données supplémentaires pour questions hors dashboard
     """
     kpis = get_kpis()
     return {
-        # Page 1
-        "kpis"           : kpis,
-        "evolution_ca"   : get_evolution_ca(),
-        "clients"        : get_clients(),
-        "categories"     : get_categories(),
-        # Page 2
-        "statuts"        : get_statuts(),
-        "qte_par_mois"   : get_qte_par_mois(),
-        # Page 3
-        "kpis_prod"      : get_kpis_produits(),
-        "top10_ca"       : get_top10_ca(),
-        "top5_qte"       : get_top5_qte(),
-        "top10_panier"   : get_top10_panier(),
-        "detail_produits": get_detail_produits(),
+        # ── Rapport Power BI — Page 1 ─────────────────────
+        "kpis"              : kpis,
+        "evolution_ca"      : get_evolution_ca(),
+        "clients"           : get_clients(),
+        "categories"        : get_categories(),
+
+        # ── Rapport Power BI — Page 2 ─────────────────────
+        "statuts"           : get_statuts(),
+        "qte_par_mois"      : get_qte_par_mois(),
+
+        # ── Rapport Power BI — Page 3 ─────────────────────
+        "kpis_prod"         : get_kpis_produits(),
+        "top10_ca"          : get_top10_ca(),
+        "top5_qte"          : get_top5_qte(),
+        "top10_panier"      : get_top10_panier(),
+        "detail_produits"   : get_detail_produits(),
+
+        # ── Données supplémentaires (hors dashboard) ──────
+        "historique"        : get_historique_commandes(),
+        "tous_produits"     : get_tous_produits(),
+        "clients_details"   : get_clients_details(),
+        "croise_produit_client": get_ca_par_produit_et_client(),
+        "tendances_hebdo"   : get_tendances_hebdo(),
+        "devis_non_convertis": get_devis_non_convertis(),
     }
