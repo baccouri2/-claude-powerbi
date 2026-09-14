@@ -57,8 +57,8 @@ def get_kpis():
             ROUND(SUM(sol.price_subtotal)::numeric
                   / NULLIF(COUNT(DISTINCT so.id), 0), 2)                        AS panier_moyen,
             SUM(sol.product_uom_qty)                                             AS qte_vendue,
-            MIN(so.date_order::date)                                             AS date_debut,
-            MAX(so.date_order::date)                                             AS date_fin
+            TO_CHAR(MIN(so.date_order), 'YYYY-MM-DD')                           AS date_debut,
+            TO_CHAR(MAX(so.date_order), 'YYYY-MM-DD')                           AS date_fin
         FROM sale_order so
         JOIN sale_order_line sol ON sol.order_id = so.id
         WHERE so.state != 'cancel'
@@ -209,14 +209,14 @@ def get_historique_commandes():
     c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     c.execute("""
         SELECT
-            so.name                                    AS numero_commande,
-            so.date_order::date                        AS date_commande,
-            rp.name                                    AS client,
-            so.state                                   AS statut,
-            ROUND(so.amount_untaxed::numeric, 2)       AS montant_ht,
-            ROUND(so.amount_total::numeric, 2)         AS montant_ttc,
-            COUNT(sol.id)                              AS nb_lignes,
-            SUM(sol.product_uom_qty)                   AS qte_totale
+            so.name                                         AS numero_commande,
+            TO_CHAR(so.date_order, 'YYYY-MM-DD')            AS date_commande,
+            rp.name                                         AS client,
+            so.state                                        AS statut,
+            ROUND(so.amount_untaxed::numeric, 2)            AS montant_ht,
+            ROUND(so.amount_total::numeric, 2)              AS montant_ttc,
+            COUNT(sol.id)                                   AS nb_lignes,
+            SUM(sol.product_uom_qty)                        AS qte_totale
         FROM sale_order so
         JOIN res_partner rp      ON rp.id = so.partner_id
         JOIN sale_order_line sol ON sol.order_id = so.id
@@ -269,15 +269,15 @@ def get_clients_details():
     c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     c.execute("""
         SELECT
-            rp.name                                    AS client,
-            rp.email                                   AS email,
-            rp.phone                                   AS telephone,
-            rp.city                                    AS ville,
-            rp.customer_rank                           AS rang_client,
-            COUNT(DISTINCT so.id)                      AS nb_commandes_total,
-            ROUND(SUM(sol.price_subtotal)::numeric, 2) AS ca_total,
-            MIN(so.date_order::date)                   AS premiere_commande,
-            MAX(so.date_order::date)                   AS derniere_commande
+            rp.name                                         AS client,
+            rp.email                                        AS email,
+            rp.phone                                        AS telephone,
+            rp.city                                         AS ville,
+            rp.customer_rank                                AS rang_client,
+            COUNT(DISTINCT so.id)                           AS nb_commandes_total,
+            ROUND(SUM(sol.price_subtotal)::numeric, 2)      AS ca_total,
+            TO_CHAR(MIN(so.date_order), 'YYYY-MM-DD')       AS premiere_commande,
+            TO_CHAR(MAX(so.date_order), 'YYYY-MM-DD')       AS derniere_commande
         FROM res_partner rp
         LEFT JOIN sale_order so      ON so.partner_id = rp.id
                                     AND so.state != 'cancel'
@@ -331,10 +331,10 @@ def get_tendances_hebdo():
     c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     c.execute("""
         SELECT
-            DATE_TRUNC('week', so.date_order)::date    AS semaine,
-            COUNT(DISTINCT so.id)                      AS nb_commandes,
-            ROUND(SUM(sol.price_subtotal)::numeric, 2) AS ca_ht,
-            SUM(sol.product_uom_qty)                   AS qte_vendue
+            TO_CHAR(DATE_TRUNC('week', so.date_order), 'YYYY-MM-DD') AS semaine,
+            COUNT(DISTINCT so.id)                                      AS nb_commandes,
+            ROUND(SUM(sol.price_subtotal)::numeric, 2)                AS ca_ht,
+            SUM(sol.product_uom_qty)                                   AS qte_vendue
         FROM sale_order so
         JOIN sale_order_line sol ON sol.order_id = so.id
         WHERE so.state != 'cancel'
@@ -352,12 +352,12 @@ def get_devis_non_convertis():
     c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     c.execute("""
         SELECT
-            so.name                                    AS numero_devis,
-            so.date_order::date                        AS date_devis,
-            rp.name                                    AS client,
-            so.state                                   AS statut,
-            ROUND(so.amount_untaxed::numeric, 2)       AS montant_ht,
-            (CURRENT_DATE - so.date_order::date)       AS jours_en_attente
+            so.name                                         AS numero_devis,
+            TO_CHAR(so.date_order, 'YYYY-MM-DD')            AS date_devis,
+            rp.name                                         AS client,
+            so.state                                        AS statut,
+            ROUND(so.amount_untaxed::numeric, 2)            AS montant_ht,
+            (CURRENT_DATE - so.date_order::date)            AS jours_en_attente
         FROM sale_order so
         JOIN res_partner rp ON rp.id = so.partner_id
         WHERE so.state IN ('draft', 'sent')
@@ -366,7 +366,7 @@ def get_devis_non_convertis():
     result = []
     for r in c.fetchall():
         d = dict(r)
-        d["montant_ht"]      = flt(d["montant_ht"])
+        d["montant_ht"]       = flt(d["montant_ht"])
         d["jours_en_attente"] = int(d["jours_en_attente"]) if d["jours_en_attente"] else 0
         result.append(d)
     c.close(); conn.close()
