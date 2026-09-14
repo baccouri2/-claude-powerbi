@@ -6,7 +6,14 @@ Fonctionne en local (Power BI Direct) et sur Render (PostgreSQL)
 from flask import Flask, render_template, request, jsonify
 from claude_agent import chat
 from config import PORT, DEBUG
-import threading, os
+import os, threading
+from datetime import datetime, timezone, timedelta
+
+# Fuseau horaire Tunisie = UTC+1
+TZ_TUNISIE = timezone(timedelta(hours=1))
+
+def now_tunisie():
+    return datetime.now(TZ_TUNISIE).strftime("%H:%M:%S")
 
 app = Flask(__name__)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
@@ -76,30 +83,40 @@ def api_kpis():
             "prix_moyen"      : kp.get("prix_moyen", 0),
             "qte_top_produit" : kp.get("qte_top_produit", 0),
             "nb_non_vendus"   : kp.get("nb_non_vendus", 0),
-            "last_sync"       : __import__('datetime').datetime.now().strftime("%H:%M:%S")
+            "last_sync"       : now_tunisie()
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 @app.route("/api/chat", methods=["POST"])
 def api_chat():
-    body       = request.json or {}
-    question   = body.get("question", "").strip()
-    historique = body.get("historique", [])
-    page       = body.get("page", "all")
+    try:
+        body       = request.json or {}
+        question   = body.get("question", "").strip()
+        historique = body.get("historique", [])
+        page       = body.get("page", "all")
 
-    if not question:
-        return jsonify({"success": False, "response": "Question vide."}), 400
+        if not question:
+            return jsonify({"success": False, "response": "Question vide."}), 400
 
-    data = get_data()
-    page_context = {
-        "page1": " (Page 1 — Vue Generale)",
-        "page2": " (Page 2 — Analyse Commerciale)",
-        "page3": " (Page 3 — Analyse Produits)",
-        "all"  : ""
-    }
-    result = chat(question + page_context.get(page, ""), historique, data)
-    return jsonify(result)
+        data = get_data()
+        page_context = {
+            "page1": " (Page 1 — Vue Generale)",
+            "page2": " (Page 2 — Analyse Commerciale)",
+            "page3": " (Page 3 — Analyse Produits)",
+            "all"  : ""
+        }
+        result = chat(question + page_context.get(page, ""), historique, data)
+        return jsonify(result)
+
+    except Exception as e:
+        print(f"Erreur /api/chat : {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            "success" : False,
+            "response": f"❌ Erreur serveur : {str(e)}"
+        }), 500
 
 if __name__ == "__main__":
     print("=" * 60)
