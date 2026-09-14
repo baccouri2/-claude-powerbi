@@ -14,8 +14,14 @@ from config import DB_CONFIG
 # ── Utilitaires ───────────────────────────────────────────
 
 def flt(v):
-    """Convertir Decimal en float"""
-    return float(v) if isinstance(v, Decimal) else v
+    """Convertir Decimal et date en types JSON-compatibles"""
+    from decimal import Decimal
+    from datetime import date, datetime
+    if isinstance(v, Decimal):
+        return float(v)
+    if isinstance(v, (date, datetime)):
+        return str(v)
+    return v
 
 def nom_produit(raw):
     """Extraire le nom lisible depuis JSON multilingue Odoo"""

@@ -4,10 +4,12 @@ Fonctionne en local (Power BI Direct) et sur Render (PostgreSQL)
 """
 
 from flask import Flask, render_template, request, jsonify
+from flask.json.provider import DefaultJSONProvider
 from claude_agent import chat
 from config import PORT, DEBUG
-import os, threading
-from datetime import datetime, timezone, timedelta
+import os, threading, json
+from datetime import datetime, timezone, timedelta, date
+from decimal import Decimal
 
 # Fuseau horaire Tunisie = UTC+1
 TZ_TUNISIE = timezone(timedelta(hours=1))
@@ -15,7 +17,18 @@ TZ_TUNISIE = timezone(timedelta(hours=1))
 def now_tunisie():
     return datetime.now(TZ_TUNISIE).strftime("%H:%M:%S")
 
+# ── Encodeur JSON — convertit date et Decimal ─────────────
+class SafeJSONProvider(DefaultJSONProvider):
+    def default(self, obj):
+        if isinstance(obj, (date, datetime)):
+            return str(obj)
+        if isinstance(obj, Decimal):
+            return float(obj)
+        return super().default(obj)
+
 app = Flask(__name__)
+app.json_provider_class = SafeJSONProvider
+app.json = SafeJSONProvider(app)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
 # ── Source de données selon l'environnement ───────────────
