@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: claude-powerbi
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: CLAUDE_API_KEY
+        value: jJpe7kVl1djoLlPxJdprdRiBdCc979AAcrOflFZP47rpWsjl
+      - key: DB_HOST
+        value: 63.250.55.89
+      - key: DB_PORT
+        value: 6432
+      - key: DB_NAME
+        value: compta_test_27_07
+      - key: DB_USER
+        value: compta_user
+      - key: DB_PASSWORD
+        value: yuiikcçBLJDFgil

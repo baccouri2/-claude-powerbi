@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+
+# Environnement virtuel
+venv/
+env/
+.venv/
+
+# DLL ADOMD (trop lourde pour GitHub)
+adomd_lib/
+adomd.zip
+adomd.nupkg
+
+# Fichiers locaux
+*.log
+*.tmp
+test_*.py
+find_*.py
+check_*.py
+debug_*.py
+
+# Secrets (ne jamais pousser sur GitHub)
+# config.py contient les vrais secrets
+# mais les variables d'env Render les remplacent
