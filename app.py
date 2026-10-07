@@ -7,7 +7,7 @@ from flask import Flask, render_template, request, jsonify
 from flask.json.provider import DefaultJSONProvider
 from claude_agent import chat
 from config import PORT, DEBUG
-import os, threading, json
+import os, threading, json, time, requests as _requests
 from datetime import datetime, timezone, timedelta, date
 from decimal import Decimal
 
@@ -71,6 +71,10 @@ if not os.environ.get("RENDER"):
         print(f"Sync non disponible : {e}")
 
 # ── Routes ────────────────────────────────────────────────
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok", "time": now_tunisie()})
+
 @app.route("/favicon.ico")
 def favicon():
     return "", 204
@@ -188,3 +192,21 @@ if __name__ == "__main__":
     print(f"  URL : http://localhost:{PORT}")
     print("=" * 60)
     app.run(debug=DEBUG, port=PORT, host="0.0.0.0")
+
+# ── Keep-alive sur Render (évite le cold start) ───────────
+def _keep_alive():
+    """Ping le serveur toutes les 10 minutes pour éviter l'endormissement"""
+    time.sleep(60)  # attendre 1 minute au démarrage
+    url = os.environ.get("RENDER_EXTERNAL_URL", "https://claude-powerbi.onrender.com")
+    while True:
+        try:
+            _requests.get(f"{url}/health", timeout=10)
+            print(f"[Keep-alive] ping OK — {now_tunisie()}")
+        except Exception as e:
+            print(f"[Keep-alive] erreur : {e}")
+        time.sleep(600)  # toutes les 10 minutes
+
+if os.environ.get("RENDER"):
+    _t = threading.Thread(target=_keep_alive, daemon=True)
+    _t.start()
+    print("Keep-alive démarré (ping toutes les 10 min)")
