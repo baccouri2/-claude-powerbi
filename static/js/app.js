@@ -156,6 +156,8 @@ async function loadKPIs(verbose = true) {
         allKpis = k;
 
         document.getElementById('kpiList').innerHTML = `
+            <b>CA Total</b>        : ${n(k.ca_total)} DT<br>
+            <b>CA TTC</b>          : ${n(k.ca_ttc)} DT<br>
             <b>CA HT</b>           : ${n(k.ca_ht)} DT<br>
             <b>Marge Brute</b>     : ${n(k.marge_brute)} DT (${p(k.taux_marge)})<br>
             <b>Taux Conversion</b> : ${p(k.taux_conversion)}<br>
@@ -222,6 +224,8 @@ function updatePageData() {
 
     if (currentPage === 'all') {
         html = `
+            <div class="pd-card"><div class="pd-label">CA Total</div><div class="pd-value">${n(k.ca_total)} DT</div></div>
+            <div class="pd-card"><div class="pd-label">CA TTC</div><div class="pd-value">${n(k.ca_ttc)} DT</div></div>
             <div class="pd-card"><div class="pd-label">CA HT</div><div class="pd-value">${n(k.ca_ht)} DT</div></div>
             <div class="pd-card"><div class="pd-label">Marge Brute</div><div class="pd-value">${n(k.marge_brute)} DT</div></div>
             <div class="pd-card"><div class="pd-label">Taux Marge</div><div class="pd-value">${p(k.taux_marge)}</div></div>
@@ -235,15 +239,17 @@ function updatePageData() {
         `;
     } else if (currentPage === 'page1') {
         html = `
+            <div class="pd-card"><div class="pd-label">CA Total</div><div class="pd-value">${n(k.ca_total)} DT</div></div>
+            <div class="pd-card"><div class="pd-label">CA TTC</div><div class="pd-value">${n(k.ca_ttc)} DT</div></div>
             <div class="pd-card"><div class="pd-label">CA HT</div><div class="pd-value">${n(k.ca_ht)} DT</div></div>
             <div class="pd-card"><div class="pd-label">Panier Moyen</div><div class="pd-value">${n(k.panier_moyen)} DT</div></div>
-            <div class="pd-card"><div class="pd-label">Marge Brute</div><div class="pd-value">${n(k.marge_brute)} DT</div></div>
-            <div class="pd-card"><div class="pd-label">Taux Conversion</div><div class="pd-value">${p(k.taux_conversion)}</div></div>
             <div class="pd-card"><div class="pd-label">Nombre Commandes</div><div class="pd-value">${k.nb_commandes}</div></div>
             <div class="pd-card"><div class="pd-label">Nombre Clients</div><div class="pd-value">${k.nb_clients}</div></div>
         `;
     } else if (currentPage === 'page2') {
         html = `
+            <div class="pd-card"><div class="pd-label">CA Total</div><div class="pd-value">${n(k.ca_total)} DT</div></div>
+            <div class="pd-card"><div class="pd-label">CA TTC</div><div class="pd-value">${n(k.ca_ttc)} DT</div></div>
             <div class="pd-card"><div class="pd-label">CA HT</div><div class="pd-value">${n(k.ca_ht)} DT</div></div>
             <div class="pd-card"><div class="pd-label">Marge Brute</div><div class="pd-value">${n(k.marge_brute)} DT</div></div>
             <div class="pd-card"><div class="pd-label">Taux de Marge</div><div class="pd-value">${p(k.taux_marge)}</div></div>

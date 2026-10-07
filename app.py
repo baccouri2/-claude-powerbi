@@ -135,6 +135,9 @@ def api_kpis():
         kp   = data.get("kpis_prod", {})
         return jsonify({
             "ca_ht"           : k.get("ca_ht", 0),
+            "ca_total"        : k.get("ca_total", 0),
+            "ca_ttc"          : k.get("ca_ttc", 0),
+            "taxes_total"     : k.get("taxes_total", 0),
             "marge_brute"     : k.get("marge_brute", 0),
             "taux_marge"      : k.get("taux_marge", 0),
             "taux_conversion" : k.get("taux_conversion", 0),

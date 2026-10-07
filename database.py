@@ -69,6 +69,21 @@ def get_kpis():
     k["marge_brute"]     = round(k["ca_ht"] * 0.1691, 2)
     k["taux_marge"]      = 16.91
 
+    # CA Total = CA HT + taxes (toutes taxes)
+    conn2 = get_conn()
+    c2 = conn2.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+    c2.execute("""
+        SELECT
+            ROUND(SUM(so.amount_total)::numeric, 2)    AS ca_total,
+            ROUND(SUM(so.amount_tax)::numeric, 2)       AS taxes_total
+        FROM sale_order so
+        WHERE so.state != 'cancel'
+    """)
+    ca_row = dict(c2.fetchone())
+    k["ca_total"]   = flt(ca_row["ca_total"])   # 463 103.38 DT
+    k["taxes_total"]= flt(ca_row["taxes_total"])
+    c2.close(); conn2.close()
+
     # Taux de conversion = commandes confirmées (sale) / total devis
     c.execute("""
         SELECT COUNT(*)                                             AS total,
