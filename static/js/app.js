@@ -67,8 +67,11 @@ window.addEventListener('DOMContentLoaded', () => {
     renderConvList();           // Charger l'historique depuis localStorage
     restoreLastConv();          // Restaurer la dernière conversation ouverte
     document.getElementById('inp').focus();
-    // Synchronisation automatique toutes les 30 secondes (Render = serveur distant)
-    setInterval(() => loadKPIs(false), 30000);
+    // Synchronisation automatique toutes les 30 secondes
+    setInterval(() => {
+        loadKPIs(false);
+        checkDataUpdate();
+    }, 30000);
 });
 
 // ── Restaurer la dernière conversation ───────────────────
@@ -80,7 +83,71 @@ function restoreLastConv() {
     if (conv) loadConv(conv.id, false);
 }
 
-// ── KPIs depuis Odoo ──────────────────────────────────────
+// ── Vérification mise à jour données ─────────────────────
+let lastCA = null;
+async function checkDataUpdate() {
+    try {
+        const res = await fetch('/api/kpis');
+        const k   = await res.json();
+        if (k.error) return;
+
+        const newCA = k.ca_ht;
+        if (lastCA !== null && newCA !== lastCA) {
+            // Les données ont changé → afficher une notification
+            showUpdateBanner(lastCA, newCA, k);
+        }
+        lastCA = newCA;
+    } catch(e) {}
+}
+
+function showUpdateBanner(oldCA, newCA, k) {
+    // Supprimer l'ancien banner s'il existe
+    const old = document.getElementById('update-banner');
+    if (old) old.remove();
+
+    const banner = document.createElement('div');
+    banner.id = 'update-banner';
+    banner.style.cssText = [
+        'position:fixed','bottom:80px','right:20px','z-index:9999',
+        'background:#37863C','color:white','padding:12px 16px',
+        'border-radius:10px','font-size:12px','max-width:280px',
+        'box-shadow:0 4px 12px rgba(0,0,0,0.3)',
+        'animation:slideIn 0.3s ease'
+    ].join(';');
+
+    const diff = (newCA - oldCA).toFixed(2);
+    const signe = diff > 0 ? '+' : '';
+
+    banner.innerHTML = `
+        <div style="font-weight:700;margin-bottom:4px">🔄 Données mises à jour</div>
+        <div>CA HT : <strong>${parseFloat(newCA).toLocaleString('fr-FR',{minimumFractionDigits:2})} DT</strong></div>
+        <div style="font-size:11px;opacity:0.9">Variation : ${signe}${diff} DT</div>
+        <div style="font-size:11px;opacity:0.8;margin-top:4px">Cmdes: ${k.nb_commandes} · Clients: ${k.nb_clients}</div>
+        <button onclick="document.getElementById('update-banner').remove()"
+          style="margin-top:8px;width:100%;background:rgba(255,255,255,0.2);
+          border:none;color:white;padding:4px;border-radius:5px;cursor:pointer;font-size:11px">
+          ✕ Fermer
+        </button>
+    `;
+
+    document.body.appendChild(banner);
+
+    // Disparaît automatiquement après 8 secondes
+    setTimeout(() => {
+        if (document.getElementById('update-banner')) {
+            document.getElementById('update-banner').remove();
+        }
+    }, 8000);
+}
+
+// Animation CSS pour le banner
+const style = document.createElement('style');
+style.textContent = `
+@keyframes slideIn {
+    from { transform: translateX(100px); opacity: 0; }
+    to   { transform: translateX(0);     opacity: 1; }
+}`;
+document.head.appendChild(style);
 async function loadKPIs(verbose = true) {
     try {
         const res = await fetch('/api/kpis');
