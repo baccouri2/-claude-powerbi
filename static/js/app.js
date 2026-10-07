@@ -41,22 +41,24 @@ const SUGGESTIONS = {
         { icon: '🎯', title: 'Conversion',         sub: 'Optimisation devis',           q: 'Comment améliorer le taux de conversion des devis ?' },
     ],
     page1: [
-        { icon: '📊', title: 'KPIs Vue Générale',  sub: 'CA, Marge, Conversion',        q: 'Analyse tous les KPIs de la page Vue Générale' },
+        { icon: '📊', title: 'KPIs Vue Générale',  sub: 'CA, CA TTC, CA HT',            q: 'Analyse tous les KPIs de la page Vue Générale' },
         { icon: '📈', title: 'Évolution CA',       sub: 'Tendance mensuelle',           q: 'Comment évolue le CA mois par mois ?' },
-        { icon: '👥', title: 'Répartition clients',sub: '% CA par client',              q: 'Analyse la répartition du CA par client' },
-        { icon: '🗂️', title: 'CA par catégorie',  sub: 'Barres horizontales',          q: 'Quelle catégorie de produit génère le plus de CA ?' },
+        { icon: '👥', title: 'Top 5 Clients',      sub: '% CA par client',              q: 'Analyse le Top 5 clients par CA' },
+        { icon: '🗂️', title: 'CA par Catégorie',  sub: 'Home Construction, Services',  q: 'Quelle catégorie de produit génère le plus de CA ?' },
     ],
     page2: [
-        { icon: '📋', title: 'KPIs Commerciale',  sub: 'CA, Marge, Taux Marge',        q: 'Analyse tous les KPIs de la page Analyse Commerciale' },
-        { icon: '🎯', title: 'Taux conversion',   sub: '76% — comment améliorer ?',    q: 'Comment améliorer le taux de conversion de 76% ?' },
-        { icon: '📦', title: 'Quantité vendue',   sub: 'Par mois',                     q: 'Analyse la quantité vendue par mois' },
-        { icon: '👤', title: 'Clients',           sub: 'Performance commerciale',      q: 'Quels clients ont le meilleur potentiel commercial ?' },
+        { icon: '📋', title: 'KPIs Clientèles',   sub: 'CA, CA TTC, CA HT',            q: 'Analyse tous les KPIs de la page Analyse Clientèles' },
+        { icon: '💎', title: 'CLV Client',         sub: 'Valeur cumulée par client',    q: 'Analyse la valeur cumulée par client (CLV)' },
+        { icon: '🎯', title: 'Taux Conversion',    sub: '76% — analyse',                q: 'Analyse le taux de conversion de 76%' },
+        { icon: '📦', title: 'Qté Par Client',     sub: 'Quantité vendue par client',   q: 'Analyse la quantité vendue par client' },
+        { icon: '💰', title: 'Rentabilité',        sub: 'Analyse rentabilité clients',  q: 'Analyse la rentabilité par client' },
     ],
     page3: [
-        { icon: '📊', title: 'KPIs Produits',     sub: 'Prix moyen, distincts, qté',   q: 'Analyse les KPIs de la page Analyse Produits' },
+        { icon: '📊', title: 'KPIs Produits',     sub: 'Prix moyen, distincts, qté',   q: 'Analyse les KPIs de la page Analyse Produit' },
         { icon: '🏅', title: 'Top 10 CA',         sub: 'Produits les plus rentables',  q: 'Quels sont les 10 produits qui génèrent le plus de CA ?' },
-        { icon: '📦', title: 'Top 5 Quantité',    sub: 'Produits les plus vendus',     q: 'Quels sont les 5 produits les plus vendus en quantité ?' },
-        { icon: '💰', title: 'Panier moyen',      sub: 'Par produit',                  q: 'Quels produits ont le panier moyen le plus élevé ?' },
+        { icon: '🎯', title: 'Réalisé vs Objectif',sub: 'Comparaison objectifs',        q: 'Compare le réalisé vs objectif par produit' },
+        { icon: '📦', title: 'Top 5 Qté',         sub: 'Produits les plus vendus',     q: 'Quels sont les 5 produits les plus vendus en quantité ?' },
+        { icon: '💰', title: 'Détail Ventes',     sub: 'CA Total, CA HT, CA TTC',      q: 'Donne le détail des ventes par produit avec CA Total, CA HT et CA TTC' },
     ],
 };
 
@@ -207,7 +209,7 @@ function switchPage(page) {
     const placeholders = {
         all:   'Posez une question sur les 3 pages...',
         page1: 'Posez une question sur Vue Générale...',
-        page2: 'Posez une question sur Analyse Commerciale...',
+        page2: 'Posez une question sur Analyse Clientèles...',
         page3: 'Posez une question sur Analyse Produits...',
     };
     document.getElementById('inp').placeholder = placeholders[page];
