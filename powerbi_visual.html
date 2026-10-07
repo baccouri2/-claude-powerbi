@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Claude AI – Dis4U</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', sans-serif;
+    background: #f4f6fb;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    padding: 12px;
+    gap: 10px;
+  }
+
+  /* ── En-tête ── */
+  .header {
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  .header .icon {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, #1F497D, #2E75B6);
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center; justify-content: center;
+    color: white; font-weight: bold; font-size: 18px;
+    margin-bottom: 4px;
+  }
+  .header h2 {
+    font-size: 14px; color: #1F497D; font-weight: 700;
+  }
+  .header p {
+    font-size: 10px; color: #888;
+  }
+
+  /* ── Contexte actif ── */
+  #ctx-box {
+    width: 100%;
+    background: #1F497D;
+    color: white;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 10px;
+    display: none;
+    flex-direction: column;
+    gap: 3px;
+  }
+  #ctx-box .ctx-title {
+    font-weight: 700; font-size: 11px; margin-bottom: 2px;
+  }
+  #ctx-box .ctx-row {
+    display: flex; gap: 6px; align-items: center;
+    opacity: 0.9;
+  }
+  #ctx-box .ctx-tag {
+    background: rgba(255,255,255,0.2);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 10px;
+  }
+
+  /* ── Boutons pages ── */
+  .page-btns {
+    display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;
+    width: 100%;
+  }
+  .page-btn {
+    flex: 1; min-width: 80px;
+    padding: 6px 4px;
+    border: 1.5px solid #2E75B6;
+    background: white;
+    color: #2E75B6;
+    border-radius: 6px;
+    font-size: 10px; font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+  .page-btn:hover, .page-btn.active {
+    background: #2E75B6; color: white;
+  }
+
+  /* ── Sélecteurs ── */
+  .selectors {
+    width: 100%;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .sel-group {
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .sel-label {
+    font-size: 10px; color: #555; font-weight: 600;
+  }
+  select, input[type="text"] {
+    width: 100%;
+    padding: 5px 8px;
+    border: 1.5px solid #dde3ee;
+    border-radius: 6px;
+    font-size: 11px;
+    color: #333;
+    background: white;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  select:focus, input[type="text"]:focus {
+    border-color: #2E75B6;
+  }
+
+  /* ── Bouton principal ── */
+  .btn-open {
+    width: 100%;
+    padding: 10px;
+    background: linear-gradient(135deg, #1F497D, #2E75B6);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px; font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-open:hover  { opacity: 0.9; }
+  .btn-open:active { transform: scale(0.98); }
+
+  /* ── Bouton reset ── */
+  .btn-reset {
+    background: none; border: none;
+    color: #999; font-size: 10px;
+    cursor: pointer; text-decoration: underline;
+  }
+  .btn-reset:hover { color: #C5500C; }
+
+  /* ── Statut ── */
+  #status {
+    font-size: 10px; color: #888; text-align: center;
+  }
+  #status.ok  { color: #37863C; }
+  #status.err { color: #C5500C; }
+</style>
+</head>
+<body>
+
+<!-- En-tête -->
+<div class="header">
+  <div class="icon">C</div>
+  <h2>Claude AI · Dis4U</h2>
+  <p>Interrogez vos données Power BI en langage naturel</p>
+</div>
+
+<!-- Contexte actif -->
+<div id="ctx-box">
+  <div class="ctx-title">🔗 Contexte Power BI actif</div>
+  <div id="ctx-content"></div>
+</div>
+
+<!-- Sélection page -->
+<div class="page-btns">
+  <button class="page-btn active" onclick="setPage('all',   this)">📊 Tout</button>
+  <button class="page-btn"        onclick="setPage('page1', this)">📈 Vue Générale</button>
+  <button class="page-btn"        onclick="setPage('page2', this)">🤝 Commercial</button>
+  <button class="page-btn"        onclick="setPage('page3', this)">📦 Produits</button>
+</div>
+
+<!-- Sélecteurs client / mois -->
+<div class="selectors">
+  <div class="sel-group">
+    <span class="sel-label">👤 Client (optionnel)</span>
+    <select id="sel-client">
+      <option value="">— Tous les clients —</option>
+      <option value="Deco Addict">Deco Addict</option>
+      <option value="Ready Mat">Ready Mat</option>
+      <option value="Gemini Furniture">Gemini Furniture</option>
+      <option value="Joel Willis">Joel Willis</option>
+      <option value="Lumber Inc">Lumber Inc</option>
+    </select>
+  </div>
+  <div class="sel-group">
+    <span class="sel-label">📅 Mois (optionnel)</span>
+    <select id="sel-mois">
+      <option value="">— Tous les mois —</option>
+      <option value="Mai">Mai 2025</option>
+      <option value="Juin">Juin 2025</option>
+      <option value="Juillet">Juillet 2025</option>
+      <option value="Août">Août 2025</option>
+    </select>
+  </div>
+</div>
+
+<!-- Bouton principal -->
+<button class="btn-open" onclick="openClaude()">
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="white">
+    <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"/>
+  </svg>
+  Ouvrir Claude avec ce contexte
+</button>
+
+<button class="btn-reset" onclick="resetAll()">↺ Réinitialiser la sélection</button>
+
+<div id="status">Prêt · données temps réel Odoo</div>
+
+<script>
+  // ── URL du serveur Claude (Render) ─────────────────────
+  const BASE_URL = "https://claude-powerbi.onrender.com";
+
+  // ── Page active ────────────────────────────────────────
+  let pageCourante = "all";
+
+  function setPage(page, btn) {
+    pageCourante = page;
+    document.querySelectorAll(".page-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    updateContextBox();
+  }
+
+  // ── Mettre à jour l'encadré contexte ──────────────────
+  function updateContextBox() {
+    const client = document.getElementById("sel-client").value;
+    const mois   = document.getElementById("sel-mois").value;
+    const box    = document.getElementById("ctx-box");
+    const cont   = document.getElementById("ctx-content");
+
+    const parts = [];
+    if (pageCourante !== "all") {
+      const labels = { page1:"Vue Générale", page2:"Analyse Commerciale", page3:"Analyse Produits" };
+      parts.push(`<span class="ctx-tag">📄 ${labels[pageCourante]}</span>`);
+    }
+    if (client) parts.push(`<span class="ctx-tag">👤 ${client}</span>`);
+    if (mois)   parts.push(`<span class="ctx-tag">📅 ${mois}</span>`);
+
+    if (parts.length > 0) {
+      cont.innerHTML = `<div class="ctx-row">${parts.join(" ")}</div>`;
+      box.style.display = "flex";
+    } else {
+      box.style.display = "none";
+    }
+  }
+
+  // Mettre à jour le contexte quand les selects changent
+  document.getElementById("sel-client").addEventListener("change", updateContextBox);
+  document.getElementById("sel-mois").addEventListener("change",   updateContextBox);
+
+  // ── Ouvrir Claude avec le contexte ────────────────────
+  function openClaude() {
+    const client = document.getElementById("sel-client").value;
+    const mois   = document.getElementById("sel-mois").value;
+
+    // Construire les paramètres URL
+    const params = new URLSearchParams();
+    if (pageCourante !== "all") params.set("page", pageCourante);
+    if (client) params.set("client",    client);
+    if (mois)   params.set("mois",      mois);
+
+    const url = BASE_URL + (params.toString() ? "?" + params.toString() : "");
+
+    setStatus("⏳ Ouverture de Claude...", "");
+
+    // Ouvrir dans un nouvel onglet
+    window.open(url, "_blank");
+
+    setTimeout(() => setStatus("✅ Claude ouvert avec le contexte Power BI", "ok"), 500);
+  }
+
+  // ── Reset ──────────────────────────────────────────────
+  function resetAll() {
+    document.getElementById("sel-client").value = "";
+    document.getElementById("sel-mois").value   = "";
+    pageCourante = "all";
+    document.querySelectorAll(".page-btn").forEach((b,i) => {
+      b.classList.toggle("active", i === 0);
+    });
+    updateContextBox();
+    setStatus("Prêt · données temps réel Odoo", "");
+  }
+
+  // ── Utilitaire status ─────────────────────────────────
+  function setStatus(msg, cls) {
+    const el = document.getElementById("status");
+    el.textContent  = msg;
+    el.className    = cls;
+  }
+</script>
+</body>
+</html>

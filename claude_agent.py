@@ -123,10 +123,43 @@ RÈGLES :
 ════════════════════════════════════════════════"""
 
 
-def chat(question: str, historique: list, data: dict) -> dict:
-    """Conversation Claude avec toutes les données"""
+def build_pbi_context_block(pbi_ctx: dict) -> str:
+    """Génère un bloc texte décrivant le contexte Power BI actif"""
+    if not pbi_ctx:
+        return ""
+    lines = ["════════════════════════════════════════════════",
+             "CONTEXTE POWER BI ACTIF (sélection utilisateur)",
+             "════════════════════════════════════════════════"]
+    if pbi_ctx.get("page"):
+        lines.append(f"  Page active      : {pbi_ctx['page']}")
+    if pbi_ctx.get("client"):
+        lines.append(f"  Client sélectionné : {pbi_ctx['client']}")
+    if pbi_ctx.get("categorie"):
+        lines.append(f"  Catégorie filtrée  : {pbi_ctx['categorie']}")
+    if pbi_ctx.get("mois"):
+        lines.append(f"  Mois filtré        : {pbi_ctx['mois']}")
+    if pbi_ctx.get("ca"):
+        lines.append(f"  CA affiché (filtre): {pbi_ctx['ca']}")
+    # KPIs filtrés envoyés depuis Power BI
+    kpis = pbi_ctx.get("kpis", {})
+    if kpis:
+        lines.append("  KPIs filtrés Power BI :")
+        for k, v in kpis.items():
+            lines.append(f"    {k} = {v}")
+    if pbi_ctx.get("timestamp"):
+        lines.append(f"  Mis à jour à       : {pbi_ctx['timestamp']}")
+    lines.append("→ Utilise CE contexte en priorité pour répondre à la question.")
+    lines.append("════════════════════════════════════════════════")
+    return "\n".join(lines)
+
+
+def chat(question: str, historique: list, data: dict, pbi_ctx: dict = None) -> dict:
+    """Conversation Claude avec toutes les données + contexte Power BI"""
     try:
         system   = build_system_prompt(data)
+        # Injecter le contexte Power BI actif dans le system prompt
+        if pbi_ctx:
+            system += "\n\n" + build_pbi_context_block(pbi_ctx)
         messages = []
 
         # Garder seulement les 6 derniers échanges (3 Q + 3 R)

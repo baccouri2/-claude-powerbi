@@ -101,5 +101,69 @@
 </div>
 
 <script src="/static/js/app.js?v=2"></script>
+<script>
+// ── Lecture contexte Power BI depuis l'URL ─────────────────────────
+(function () {
+  const params = new URLSearchParams(window.location.search);
+  const client    = params.get("client")    || "";
+  const categorie = params.get("categorie") || "";
+  const mois      = params.get("mois")      || "";
+  const page      = params.get("page")      || "";
+  const ca        = params.get("ca")        || "";
+
+  // S'il y a un contexte Power BI dans l'URL → l'envoyer au serveur
+  if (client || categorie || mois || page || ca) {
+    const ctx = { client, categorie, mois, page, ca };
+
+    // Afficher la bannière de contexte actif
+    const banner = document.createElement("div");
+    banner.id = "pbi-banner";
+    banner.style.cssText = [
+      "position:fixed","top:0","left:0","right:0","z-index:9999",
+      "background:#1F497D","color:#fff","padding:8px 16px",
+      "font-size:12px","display:flex","align-items:center","gap:12px",
+      "box-shadow:0 2px 8px rgba(0,0,0,0.3)"
+    ].join(";");
+
+    let parts = ["🔗 <strong>Contexte Power BI actif :</strong>"];
+    if (page)      parts.push(`📄 Page : <strong>${page}</strong>`);
+    if (client)    parts.push(`👤 Client : <strong>${client}</strong>`);
+    if (categorie) parts.push(`📦 Catégorie : <strong>${categorie}</strong>`);
+    if (mois)      parts.push(`📅 Mois : <strong>${mois}</strong>`);
+    if (ca)        parts.push(`💰 CA : <strong>${ca} DT</strong>`);
+
+    const closeBtn = `<button onclick="document.getElementById('pbi-banner').remove()"
+      style="margin-left:auto;background:rgba(255,255,255,0.2);border:none;
+      color:#fff;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px">
+      ✕ Fermer</button>`;
+
+    banner.innerHTML = parts.join(" &nbsp;·&nbsp; ") + closeBtn;
+    document.body.prepend(banner);
+    // Décaler le contenu
+    document.querySelector(".main").style.paddingTop = "44px";
+
+    // Envoyer le contexte au serveur Flask
+    fetch("/api/context", {
+      method : "POST",
+      headers: { "Content-Type": "application/json" },
+      body   : JSON.stringify(ctx)
+    }).then(r => r.json()).then(d => {
+      console.log("[PBI Contexte] envoyé :", d);
+    }).catch(e => console.warn("[PBI Contexte] erreur :", e));
+
+    // Pré-remplir la zone de saisie avec une question contextuelle
+    setTimeout(() => {
+      const inp = document.getElementById("inp");
+      if (inp && client) {
+        inp.value = `Analyse les données pour le client ${client}`;
+        if (typeof resizeTA === "function") resizeTA(inp);
+      } else if (inp && mois) {
+        inp.value = `Analyse les ventes du mois de ${mois}`;
+        if (typeof resizeTA === "function") resizeTA(inp);
+      }
+    }, 800);
+  }
+})();
+</script>
 </body>
 </html>

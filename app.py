@@ -11,6 +11,10 @@ import os, threading, json
 from datetime import datetime, timezone, timedelta, date
 from decimal import Decimal
 
+# ── Contexte Power BI partagé (mis à jour par /api/context) ──
+_pbi_context = {}
+_pbi_context_lock = threading.Lock()
+
 # Fuseau horaire Tunisie = UTC+1
 TZ_TUNISIE = timezone(timedelta(hours=1))
 
@@ -75,6 +79,50 @@ def favicon():
 def index():
     return render_template("index.html")
 
+@app.route("/api/context", methods=["POST", "OPTIONS"])
+def api_context():
+    """
+    Reçoit le contexte Power BI (filtres actifs, client sélectionné, page, etc.)
+    Appelé depuis le visuel HTML Power BI quand l'utilisateur change une sélection.
+    """
+    if request.method == "OPTIONS":
+        resp = jsonify({"ok": True})
+        resp.headers["Access-Control-Allow-Origin"]  = "*"
+        resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+        resp.headers["Access-Control-Allow-Methods"] = "POST, OPTIONS"
+        return resp
+
+    try:
+        ctx = request.json or {}
+        with _pbi_context_lock:
+            _pbi_context.clear()
+            _pbi_context.update({
+                "client"    : ctx.get("client", ""),
+                "categorie" : ctx.get("categorie", ""),
+                "mois"      : ctx.get("mois", ""),
+                "page"      : ctx.get("page", ""),
+                "ca"        : ctx.get("ca", ""),
+                "kpis"      : ctx.get("kpis", {}),
+                "timestamp" : now_tunisie()
+            })
+        print(f"[PBI Contexte] reçu : {_pbi_context}")
+        resp = jsonify({"success": True, "context": _pbi_context})
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp
+    except Exception as e:
+        resp = jsonify({"success": False, "error": str(e)})
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp, 500
+
+@app.route("/api/context", methods=["GET"])
+def api_context_get():
+    """Retourne le contexte Power BI actuel"""
+    with _pbi_context_lock:
+        ctx = dict(_pbi_context)
+    resp = jsonify(ctx)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
 @app.route("/api/kpis")
 def api_kpis():
     try:
@@ -119,7 +167,10 @@ def api_chat():
             "page3": " (Page 3 — Analyse Produits)",
             "all"  : ""
         }
-        result = chat(question + page_context.get(page, ""), historique, data)
+        # Injecter le contexte Power BI actif dans la question
+        with _pbi_context_lock:
+            pbi_ctx = dict(_pbi_context)
+        result = chat(question + page_context.get(page, ""), historique, data, pbi_ctx)
         return jsonify(result)
 
     except Exception as e:
