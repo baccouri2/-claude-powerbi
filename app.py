@@ -7,7 +7,7 @@ from flask import Flask, render_template, request, jsonify
 from flask.json.provider import DefaultJSONProvider
 from claude_agent import chat
 from config import PORT, DEBUG
-import os, threading, json, time, requests as _requests
+import os, threading, json, time
 from datetime import datetime, timezone, timedelta, date
 from decimal import Decimal
 
@@ -199,11 +199,12 @@ if __name__ == "__main__":
 # ── Keep-alive sur Render (évite le cold start) ───────────
 def _keep_alive():
     """Ping le serveur toutes les 10 minutes pour éviter l'endormissement"""
+    import requests
     time.sleep(60)  # attendre 1 minute au démarrage
     url = os.environ.get("RENDER_EXTERNAL_URL", "https://claude-powerbi.onrender.com")
     while True:
         try:
-            _requests.get(f"{url}/health", timeout=10)
+            requests.get(f"{url}/health", timeout=10)
             print(f"[Keep-alive] ping OK — {now_tunisie()}")
         except Exception as e:
             print(f"[Keep-alive] erreur : {e}")
