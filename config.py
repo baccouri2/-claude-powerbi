@@ -13,7 +13,7 @@ DB_CONFIG = {
 
 # ── Claude via CometAPI ───────────────────────────────────
 CLAUDE_API_KEY  = os.environ.get("CLAUDE_API_KEY",
-                  "jJpe7kVl1djoLlPxJdprdRiBdCc979AAcrOflFZP47rpWsjl")
+                  "sk-8Os6qd6Vxvk8zoXJJikSZIj9PL6LoiuqnqKumtSeSsFOaZiq")
 CLAUDE_BASE_URL = "https://api.cometapi.com"
 CLAUDE_MODEL    = "claude-sonnet-5"
 
